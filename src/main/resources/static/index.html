@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <title>Selecionar AUX</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #111111;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 90vh; /* Faz o body ocupar 100% da altura da janela */
+    }
+
+    .content {
+      background: #111111;
+      padding: 30px;
+      width: 500px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 80vh; /* Altura relativa à viewport */
+      max-height: 600px; /* Altura máxima opcional */
+    }
+
+    h1 {
+      text-align: center;
+      margin: 20px 0;
+      font-size: 20px;
+      color: #fff;
+    }
+
+    .aux-container {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .aux-item {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr; /* Coloca o ícone no centro */
+      align-items: center;
+      gap: 10px;
+      color: #ccc;
+      font-size: 18px;
+      padding: 10px;
+      width: 80%;
+      max-width: 500px;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+    }
+
+    .aux-item.selected {
+      background-color: rgba(255, 140, 0, 0.2);
+      color: white;
+    }
+
+    .aux-icon {
+      color: orange;
+      font-size: 24px; /* Ajuste o tamanho conforme necessário */
+      text-align: center;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-around;
+      padding: 30px 0;
+      border-top: 1px solid #333;
+      font-size: 16px;
+    }
+
+    .footer button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .footer button:hover {
+      text-decoration: underline;
+    }
+
+    .auxNumber{
+      text-align: right;
+      padding-right: 30px;
+    }
+
+    .auxLabel {
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="content">
+  <h1>Selecionar AUX</h1>
+
+  <div class="aux-container" id="auxList"></div>
+
+  <div class="footer">
+    <button onclick="cancel()">Cancel</button>
+    <button onclick="done()">Done</button>
+  </div>
+</div>
+
+<script>
+  const auxData = [
+    { id: 1, label: 'Teclado', icon: '🎹' },
+    { id: 2, label: 'Baixo', icon: 'icons/bass-guitar.png' },
+    { id: 3, label: 'Bateria', icon: '🥁' },
+    { id: 4, label: 'Violão', icon: 'icons/violao.png' },
+    { id: 5, label: 'Guitarra', icon: 'icons/guitar.png' },
+    { id: 6, label: 'Vocal', icon: '🎤' },
+    { id: 7, label: 'Vocal', icon: '🎤' },
+    { id: 8, label: 'Vocal', icon: '🎤' }
+  ];
+
+  let selectedAux = null;
+
+  const auxList = document.getElementById('auxList');
+
+  auxData.forEach(({ id, label, icon }) => {
+    const item = document.createElement('div');
+    item.className = 'aux-item';
+    const isImage = icon.endsWith('.png');
+    const iconElement = isImage
+            ? `<img src="${icon}" alt="${label}" class="aux-icon" style="width: 30px; height: 30px;">`
+            : `<span class="aux-icon">${icon}</span>`;
+
+    item.innerHTML = `<span class="auxNumber">AUX${id}</span> ${iconElement} <span class="auxLabel">${label}</span>`;
+    item.onclick = () => {
+      document.querySelectorAll('.aux-item').forEach(el => el.classList.remove('selected'));
+      item.classList.add('selected');
+      selectedAux = { id, label, icon }; // <- Inclui o ícone aqui
+    };
+    auxList.appendChild(item);
+  });
+
+  function cancel() {
+    document.querySelectorAll('.aux-item').forEach(el => el.classList.remove('selected'));
+    selectedAux = null;
+
+  }
+
+  function done() {
+    if (!selectedAux) {
+      alert("Selecione um AUX.");
+      return;
+    }
+    // Redireciona com aux, label e icon como parâmetros
+    const url = `mixer.html?aux=${selectedAux.id}&label=${encodeURIComponent(selectedAux.label)}&icon=${encodeURIComponent(selectedAux.icon)}`;
+    location.href = url;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mixer AUX</title>
+  <style>
+    /* (Estilos mantidos como no original) */
+    body { margin: 0; background: #111; color: #fff; font-family: sans-serif; overflow: hidden; }
+    .mixer-wrapper { display: flex; height: 100vh; overflow: hidden; }
+    .mixer-scroll, .hr-divisor {
+      display: flex; overflow-x: auto; overflow-y: hidden;
+      flex-grow: 1; padding: 3px 0 40px 0;
+    }
+    #hrDivisor { width: 40px; }
+    .mixer-fixed {
+      width: 80px; padding: 0 40px 40px 8px;
+      border-left: 2px solid #444;
+      background: #4f4f4ff5;
+      display: flex; flex-direction: row;
+    }
+    .fader {
+      flex: 0 0 80px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
+      margin: 0 4px; background: #1a1a1a;
+      border: 1px solid #333; border-radius: 5px;
+    }
+    #chNumber-label { font-size: 14px; }
+    #label-master { display: flex; justify-content: space-around; font-size: 12px; width: 100%; }
+    .div-label-master { padding: 0 0 3px 0 !important; }
+    .fader-label {
+      height: 65px; width: 100%; font-size: 12px;
+      text-align: center; background: #e0e0e0; color: #000;
+      display: flex; flex-direction: column; border-top: 1px solid #aaa;
+      padding: 2px; box-sizing: border-box;
+    }
+    .aux-icon-master { font-size: 24px !important; }
+    .label-icon { font-size: 20px; margin-bottom: 0px; }
+    .label-icon-master { margin-bottom: -3px; }
+    .fader-track {
+      position: relative; width: 40px;
+      height: calc(100dvh - 90px);
+      background: #333; border-radius: 10px;
+      margin: 10px 0; display: flex; align-items: flex-end;
+      overflow: hidden; touch-action: none;
+    }
+    .fader-fill {
+      width: 100%; height: 50%;
+      border-radius: 10px 10px 0 0;
+      transition: height 0.1s ease-in-out;
+    }
+    .dB-labels {
+      position: absolute; left: 45px; top: 0;
+      height: 100%; display: flex;
+      flex-direction: column; justify-content: space-between;
+      font-size: 10px; color: #aaa;
+    }
+    .masterLabel { font-size: 14px; }
+
+    /* Nova barra de controle */
+    .top-bar {
+      padding: 10px;
+      background: #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .top-bar button {
+      background: #444;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .top-bar button:hover {
+      background: #555;
+    }
+
+    .top-bar.hidden {
+      transform: translateY(-100%);
+      transition: transform 0.4s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Barra superior de controle -->
+<div class="top-bar">
+  <button onclick="sincronizar()">🔄 Sincronizar</button>
+  <span id="ws-status">🔌 Conectando...</span>
+</div>
+
+<div class="mixer-wrapper">
+  <div class="mixer-scroll" id="mixer"></div>
+  <div class="hr-divisor" id="hrDivisor"></div>
+  <div class="mixer-fixed" id="master"></div>
+</div>
+
+<script>
+  const mixer = document.getElementById("mixer");
+  const master = document.getElementById("master");
+  const wsStatus = document.getElementById("ws-status");
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const auxId = urlParams.get('aux');
+  const auxLabel = urlParams.get('label');
+  const auxIcon = urlParams.get('icon');
+
+  const channels = Array.from({ length: 24 }, (_, i) => ({
+    id: i + 1,
+    name: `Instrumento ${i + 1}`,
+    color: "#5ba2ff",
+    icon: "🎤"
+  }));
+
+  const masterChannel = {
+    id: "M",
+    name: "Master",
+    color: "#f00",
+    icon: "🎚️"
+  };
+
+  const fadersByChannel = {};
+
+  function createFader({ id, name, color, icon }, parentElement) {
+    const isImage = icon.endsWith('.png');
+    const iconClass = id === "M" ? "aux-icon-master" : "aux-icon";
+    icon = isImage
+            ? `<img src="${icon}" alt="${name}" class="${iconClass}" style="width: 26px; height: 26px;">`
+            : `<span class="${iconClass}">${icon}</span>`;
+
+    const fader = document.createElement("div");
+    fader.className = "fader";
+
+    const track = document.createElement("div");
+    track.className = "fader-track";
+
+    const fill = document.createElement("div");
+    fill.className = "fader-fill";
+    fill.style.background = color;
+    fill.style.height = "40%";
+    track.appendChild(fill);
+
+    const dBMarks = document.createElement("div");
+    dBMarks.className = "dB-labels";
+    dBMarks.innerHTML = "<div>-∞</div><div>-30</div><div>-15</div><div>0</div><div>+6</div>";
+    track.appendChild(dBMarks);
+
+    let currentValue = 64;
+
+    const updateFill = (value) => {
+      debugger;
+      currentValue = Math.max(0, Math.min(127, value));
+      const percent = (currentValue / 127) * 100;
+      fill.style.height = percent + "%";
+    };
+
+    const handleMove = (e) => {
+      debugger;
+      const rect = track.getBoundingClientRect();
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const offsetY = clientY - rect.top;
+      const percent = Math.max(0, Math.min(1, 1 - offsetY / rect.height));
+      const value = Math.round(percent * 127)
+      updateFill(value);
+      sendVolumeToMixer(id, value);
+    };
+
+    const startMove = (e) => {
+      e.preventDefault();
+      handleMove(e);
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", stopMove);
+      document.addEventListener("touchmove", handleMove);
+      document.addEventListener("touchend", stopMove);
+    };
+
+    const stopMove = () => {
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", stopMove);
+      document.removeEventListener("touchmove", handleMove);
+      document.removeEventListener("touchend", stopMove);
+    };
+
+    track.addEventListener("mousedown", startMove);
+    track.addEventListener("touchstart", startMove);
+    fader.appendChild(track);
+
+    const label = document.createElement("div");
+    label.className = "fader-label";
+    label.innerHTML = `
+      <div class="label-icon${id === "M" ? "-master" : ""}">
+        <span id="${id === "M" ? "label-master" : "chNumber-label"}">${id === "M" ? "AUX " + auxId : id}</span> ${icon}
+      </div>`;
+    if (id === "M") {
+      label.className += " div-label-master";
+      label.innerHTML += `<div class="masterLabel">${auxLabel}</div>`;
+    } else {
+      label.innerHTML += `<div>${name}</div>`;
+    }
+    fader.appendChild(label);
+    parentElement.appendChild(fader);
+
+    return { fader, update: updateFill };
+  }
+
+  channels.forEach((ch) => {
+    const faderRef = createFader(ch, mixer);
+    fadersByChannel[String(ch.id)] = faderRef;
+  });
+
+  if (auxIcon) masterChannel.icon = auxIcon;
+  createFader(masterChannel, master);
+
+  function sendVolumeToMixer(channelId, volume) {
+    const percentual = Math.round((volume / 127) * 100);
+    const payload = {
+      auxiliar: parseInt(auxId),
+      canal: parseInt(channelId),
+      valor: percentual
+    };
+
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    }
+
+    fetch(`/api/midi/volume?canal=${payload.canal}&auxiliar=${payload.auxiliar}&valor=${payload.valor}`, {
+      method: "POST"
+    });
+  }
+
+  function sincronizar() {
+    fetch("/api/testes/simular", { method: "POST" })
+            .then(() => console.log("Sincronização enviada"))
+            .catch((err) => {
+              console.error("Erro na sincronização:", err);
+              alert("Erro ao sincronizar!");
+            });
+  }
+
+  const protocol = location.protocol === "https:" ? "wss://" : "ws://";
+  const socket = new WebSocket(protocol + location.host + "/ws/midi");
+
+  socket.onopen = () => {
+    wsStatus.innerText = "✅ Conectado";
+    wsStatus.style.color = "#0f0";
+  };
+  socket.onclose = () => {
+    wsStatus.innerText = "❌ Desconectado";
+    wsStatus.style.color = "#f33";
+  };
+  socket.onerror = () => {
+    wsStatus.innerText = "⚠️ Erro na conexão";
+    wsStatus.style.color = "#ffa500";
+  };
+
+  socket.onmessage = (event) => {
+    debugger;
+    const data = JSON.parse(event.data);
+    const canalId = String(data.canal);
+    const valor = parseInt(data.valor);
+    const fader = fadersByChannel[canalId];
+    if (fader) {
+      fader.update(valor);
+    }
+  };
+
+  setTimeout(() => {
+    document.querySelector('.top-bar')?.classList.add('hidden');
+  }, 3000);
+</script>
+</body>
+</html>
