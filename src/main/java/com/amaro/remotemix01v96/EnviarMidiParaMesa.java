@@ -29,7 +29,6 @@ public class EnviarMidiParaMesa {
             System.out.println("Dispositivo não encontrado.");
             return;
         }
-// a sad sa  asd sdas d
         dispositivo.open();
         Receiver receptor = dispositivo.getReceiver();
 

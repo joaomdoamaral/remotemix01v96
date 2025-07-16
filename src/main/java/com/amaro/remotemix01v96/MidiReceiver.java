@@ -23,15 +23,18 @@ public class MidiReceiver implements Receiver {
         System.out.println("SysEx recebido: " + byteArrayToHex(data));
 
         try {
-            // ⚠️ Exemplo fictício — você precisará ajustar as posições conforme o manual Yamaha 01V96
-            if (data.length >= 9 && data[0] == 0x43) { // Verifica ID da Yamaha
-                int auxiliar = Byte.toUnsignedInt(data[6]);
-                int canal = Byte.toUnsignedInt(data[7]);   // posição pode variar
-                int valor = Byte.toUnsignedInt(data[8]);   // volume lido
+            int byteAux = Byte.toUnsignedInt(data[6]);
+            int byteCanal = Byte.toUnsignedInt(data[7]);
+            int msb = Byte.toUnsignedInt(data[10]);
+            int lsb = Byte.toUnsignedInt(data[11]);
 
-                // Envia para o frontend via WebSocket
-                broadcaster.broadcastVolumeChange(auxiliar, canal, valor);
-            }
+            int valorFinal = (msb << 7) | lsb;
+            int percentual = (int)((valorFinal / 1023.0) * 100.0);
+
+            int auxNumber = ((byteAux - 0x02) / 3) + 1;
+            int inputChannel = byteCanal + 1;
+
+            broadcaster.broadcastVolumeChange(auxNumber, inputChannel, percentual);
         } catch (Exception e) {
             e.printStackTrace();
         }

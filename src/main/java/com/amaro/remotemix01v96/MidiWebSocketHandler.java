@@ -1,7 +1,6 @@
 package com.amaro.remotemix01v96;
 
 import com.amaro.remotemix01v96.simulation.MidiService;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
@@ -12,6 +11,7 @@ public class MidiWebSocketHandler extends TextWebSocketHandler {
 
     private final MidiService midiService;
     private final MidiWebSocketBroadcaster broadcaster;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MidiWebSocketHandler(MidiService midiService, MidiWebSocketBroadcaster broadcaster) {
         this.midiService = midiService;
@@ -33,21 +33,14 @@ public class MidiWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTextMessage(WebSocketSession session, TextMessage message) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode json = mapper.readTree(message.getPayload());
+            MidiMessageDto dto = objectMapper.readValue(message.getPayload(), MidiMessageDto.class);
 
-            int canal = json.get("canal").asInt();
-            int auxiliar = json.get("auxiliar").asInt();
-            int valor = json.get("valor").asInt();
+            System.out.printf("[Simulação] Enviar para AUX %d, Canal %d, Valor %d%%%n",
+                    dto.auxNumber(), dto.inputChannel(), dto.faderLevel());
 
-            // Simula envio de mensagem MIDI (log no console)
-            System.out.printf("[Simulação] Enviar para AUX %d, Canal %d, Valor %d%%%n", auxiliar, canal, valor);
-
-            // Quando for usar real:
-            midiService.enviarVolumePercentual(canal, auxiliar, valor);
-
-
+            midiService.sendCompleteConvertedMidiMessage(dto.auxNumber(), dto.inputChannel(), dto.faderLevel());
         } catch (Exception e) {
+            System.err.println("Erro ao processar mensagem WebSocket: " + e.getMessage());
             e.printStackTrace();
         }
     }

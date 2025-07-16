@@ -208,26 +208,28 @@
   }
 
   channels.forEach((ch) => {
-    const faderRef = createFader(ch, mixer);
-    fadersByChannel[String(ch.id)] = faderRef;
+    fadersByChannel[String(ch.id)] = createFader(ch, mixer);
   });
 
   if (auxIcon) masterChannel.icon = auxIcon;
   createFader(masterChannel, master);
 
   function sendVolumeToMixer(channelId, volume) {
+    debugger;
     const percentual = Math.round((volume / 127) * 100);
+    console.log(channelId);
     const payload = {
-      auxiliar: parseInt(auxId),
-      canal: parseInt(channelId),
-      valor: percentual
+      auxNumber: parseInt(auxId),
+      inputChannel: channelId === 'M' ? 0 : parseInt(channelId),
+      faderLevel: percentual
     };
 
+    console.log(payload);
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(payload));
     }
 
-    fetch(`/api/midi/volume?canal=${payload.canal}&auxiliar=${payload.auxiliar}&valor=${payload.valor}`, {
+    fetch(`/api/midi/volume?auxNumber=${payload.auxNumber}&inputChannel=${payload.inputChannel}&faderLevel=${payload.faderLevel}`, {
       method: "POST"
     });
   }

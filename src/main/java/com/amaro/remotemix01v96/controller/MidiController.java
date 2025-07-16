@@ -12,11 +12,13 @@ public class MidiController {
     private MidiService midiService;
 
     @PostMapping("/volume")
-    public void setarVolume(
-            @RequestParam int canal,
-            @RequestParam int auxiliar,
-            @RequestParam int valor // valor de 0 a 100
+    public void setarVolume(@RequestParam int auxNumber, @RequestParam int inputChannel, @RequestParam int faderLevel // valor de 0 a 100
     ) {
-        midiService.enviarVolumePercentual(canal, auxiliar, valor);
+        try {
+            midiService.sendCompleteConvertedMidiMessage(auxNumber, inputChannel, faderLevel);
+        }
+        catch (Exception e) {
+            System.out.println("Erro ao enviar midi: " + e.getMessage());
+        }
     }
 }

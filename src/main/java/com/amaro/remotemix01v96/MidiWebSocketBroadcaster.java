@@ -35,10 +35,9 @@ public class MidiWebSocketBroadcaster {
             }
         }
     }
-
-    // ✅ Adicionado para permitir envio de mensagens JSON estruturadas
-    public void broadcastVolumeChange(int auxiliar, int canal, int valor) {
-        String json = String.format("{\"auxiliar\":%d,\"canal\":%d,\"valor\":%d}", auxiliar, canal, valor);
+    
+    public void broadcastVolumeChange(int auxNumber, int inputChannel, int faderLevel) {
+        String json = String.format("{\"auxiliar\":%d,\"canal\":%d,\"valor\":%d}", auxNumber, inputChannel, faderLevel);
         broadcast(json);
     }
 }
