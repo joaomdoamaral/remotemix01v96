@@ -21,4 +21,10 @@ public class MidiController {
             System.out.println("Erro ao enviar midi: " + e.getMessage());
         }
     }
+
+    @PostMapping("/sincronizar")
+    public void sincronizarVolumes(@RequestParam("aux") int aux) {
+        System.out.println(" #### Sincronando midi ... ######");
+        midiService.solicitarLeituraDeVolumes(aux, aux, 0, 24); // inclui o canal 0 (master)
+    }
 }

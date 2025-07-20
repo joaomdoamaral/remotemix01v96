@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mixer AUX</title>
   <style>
-    /* (Estilos mantidos como no original) */
     body { margin: 0; background: #111; color: #fff; font-family: sans-serif; overflow: hidden; }
     .mixer-wrapper { display: flex; height: 100vh; overflow: hidden; }
     .mixer-scroll, .hr-divisor {
@@ -14,7 +13,7 @@
     }
     #hrDivisor { width: 40px; }
     .mixer-fixed {
-      width: 80px; padding: 0 40px 40px 8px;
+      width: 80px; padding: 0 20px 40px 8px;
       border-left: 2px solid #444;
       background: #4f4f4ff5;
       display: flex; flex-direction: row;
@@ -26,9 +25,6 @@
       margin: 0 4px; background: #1a1a1a;
       border: 1px solid #333; border-radius: 5px;
     }
-    #chNumber-label { font-size: 14px; }
-    #label-master { display: flex; justify-content: space-around; font-size: 12px; width: 100%; }
-    .div-label-master { padding: 0 0 3px 0 !important; }
     .fader-label {
       height: 65px; width: 100%; font-size: 12px;
       text-align: center; background: #e0e0e0; color: #000;
@@ -56,42 +52,21 @@
       flex-direction: column; justify-content: space-between;
       font-size: 10px; color: #aaa;
     }
-    .masterLabel { font-size: 14px; }
-
-    /* Nova barra de controle */
-    .top-bar {
-      padding: 10px;
-      background: #222;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 14px;
-    }
-    .top-bar button {
-      background: #444;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .top-bar button:hover {
-      background: #555;
-    }
-
-    .top-bar.hidden {
-      transform: translateY(-100%);
-      transition: transform 0.4s ease-in-out;
+    .ws-indicator {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffa500;
+      z-index: 9999;
     }
   </style>
 </head>
 <body>
 
-<!-- Barra superior de controle -->
-<div class="top-bar">
-  <button onclick="sincronizar()">🔄 Sincronizar</button>
-  <span id="ws-status">🔌 Conectando...</span>
-</div>
+<div class="ws-indicator" id="wsIndicator"></div>
 
 <div class="mixer-wrapper">
   <div class="mixer-scroll" id="mixer"></div>
@@ -102,7 +77,7 @@
 <script>
   const mixer = document.getElementById("mixer");
   const master = document.getElementById("master");
-  const wsStatus = document.getElementById("ws-status");
+  const wsIndicator = document.getElementById("wsIndicator");
 
   const urlParams = new URLSearchParams(window.location.search);
   const auxId = urlParams.get('aux');
@@ -152,19 +127,17 @@
     let currentValue = 64;
 
     const updateFill = (value) => {
-      debugger;
       currentValue = Math.max(0, Math.min(127, value));
       const percent = (currentValue / 127) * 100;
       fill.style.height = percent + "%";
     };
 
     const handleMove = (e) => {
-      debugger;
       const rect = track.getBoundingClientRect();
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       const offsetY = clientY - rect.top;
       const percent = Math.max(0, Math.min(1, 1 - offsetY / rect.height));
-      const value = Math.round(percent * 127)
+      const value = Math.round(percent * 127);
       updateFill(value);
       sendVolumeToMixer(id, value);
     };
@@ -212,19 +185,16 @@
   });
 
   if (auxIcon) masterChannel.icon = auxIcon;
-  createFader(masterChannel, master);
+  fadersByChannel["M"] = createFader(masterChannel, master);
 
   function sendVolumeToMixer(channelId, volume) {
-    debugger;
     const percentual = Math.round((volume / 127) * 100);
-    console.log(channelId);
     const payload = {
       auxNumber: parseInt(auxId),
       inputChannel: channelId === 'M' ? 0 : parseInt(channelId),
       faderLevel: percentual
     };
 
-    console.log(payload);
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(payload));
     }
@@ -234,45 +204,49 @@
     });
   }
 
-  function sincronizar() {
-    fetch("/api/testes/simular", { method: "POST" })
-            .then(() => console.log("Sincronização enviada"))
-            .catch((err) => {
-              console.error("Erro na sincronização:", err);
-              alert("Erro ao sincronizar!");
-            });
+  const socket = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/midi");
+
+  socket.onopen = () => wsIndicator.style.background = "#0f0";
+  socket.onclose = () => wsIndicator.style.background = "#f33";
+  socket.onerror = () => wsIndicator.style.background = "#ffa500";
+
+  function canalParaIdFader(canal) {
+    return canal === 0 ? "M" : String(canal);
   }
 
-  const protocol = location.protocol === "https:" ? "wss://" : "ws://";
-  const socket = new WebSocket(protocol + location.host + "/ws/midi");
-
-  socket.onopen = () => {
-    wsStatus.innerText = "✅ Conectado";
-    wsStatus.style.color = "#0f0";
-  };
-  socket.onclose = () => {
-    wsStatus.innerText = "❌ Desconectado";
-    wsStatus.style.color = "#f33";
-  };
-  socket.onerror = () => {
-    wsStatus.innerText = "⚠️ Erro na conexão";
-    wsStatus.style.color = "#ffa500";
-  };
-
   socket.onmessage = (event) => {
-    debugger;
     const data = JSON.parse(event.data);
-    const canalId = String(data.canal);
-    const valor = parseInt(data.valor);
-    const fader = fadersByChannel[canalId];
+    console.log("[WS] Mensagem recebida:", data);
+
+    const fader = fadersByChannel[canalParaIdFader(data.canal)];
     if (fader) {
+      const valor = Math.round((data.valor / 100) * 127);
       fader.update(valor);
+    } else {
+      console.warn("⚠️ Fader não encontrado para canal:", data.canal);
     }
   };
 
-  setTimeout(() => {
-    document.querySelector('.top-bar')?.classList.add('hidden');
-  }, 3000);
+  let syncInterval = null;
+
+  function iniciarSincronizacaoAutomatica(aux) {
+    pararSincronizacao();
+    syncInterval = setInterval(() => {
+      fetch(`/api/midi/sincronizar?aux=${aux}`, { method: "POST" })
+              .then(() => console.log(`[SYNC] Solicitado AUX ${aux}`))
+              .catch((err) => console.error("[SYNC] Falha:", err));
+    }, 10000);
+  }
+
+  function pararSincronizacao() {
+    if (syncInterval) {
+      clearInterval(syncInterval);
+      syncInterval = null;
+    }
+  }
+
+  if (auxId) iniciarSincronizacaoAutomatica(auxId);
+  window.addEventListener("beforeunload", pararSincronizacao);
 </script>
 </body>
 </html>

@@ -35,9 +35,9 @@ public class MidiWebSocketBroadcaster {
             }
         }
     }
-    
+
     public void broadcastVolumeChange(int auxNumber, int inputChannel, int faderLevel) {
-        String json = String.format("{\"auxiliar\":%d,\"canal\":%d,\"valor\":%d}", auxNumber, inputChannel, faderLevel);
+        String json = String.format("{\"canal\":%d,\"valor\":%d}", inputChannel, faderLevel);
         broadcast(json);
     }
 }
